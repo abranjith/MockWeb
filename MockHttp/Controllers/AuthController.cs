@@ -374,4 +374,126 @@ public class AuthController : ControllerBase
             timestamp = DateTime.UtcNow
         });
     }
+
+    /// <summary>
+    /// Simulates OAuth 2.0 Authorization Endpoint
+    /// </summary>
+    /// <param name="responseType">Must be 'code'</param>
+    /// <param name="clientId">Client Identifier</param>
+    /// <param name="redirectUri">URL to redirect back to</param>
+    /// <param name="state">Opaque value used to maintain state between the request and the callback</param>
+    /// <param name="username">User name for login simulation</param>
+    /// <param name="password">Password for login simulation</param>
+    /// <returns>Redirects to redirect_uri with code</returns>
+    [HttpGet("authorize")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult OAuthAuthorize(
+        [FromQuery(Name = "response_type")] string responseType,
+        [FromQuery(Name = "client_id")] string clientId,
+        [FromQuery(Name = "redirect_uri")] string redirectUri,
+        [FromQuery(Name = "state")] string? state = null,
+        [FromQuery] string? username = null,
+        [FromQuery] string? password = null)
+    {
+        if (string.IsNullOrEmpty(responseType) || !responseType.Equals("code", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "unsupported_response_type", message = "Only 'code' response_type is supported." });
+        }
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            return BadRequest(new { error = "invalid_request", message = "client_id is required." });
+        }
+
+        if (string.IsNullOrEmpty(redirectUri))
+        {
+            return BadRequest(new { error = "invalid_request", message = "redirect_uri is required." });
+        }
+
+        // Simulate login
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        {
+            return Unauthorized(new 
+            { 
+                error = "login_required", 
+                message = "User authentication failed. Please provide 'username' and 'password' query parameters." 
+            });
+        }
+
+        // Generate a mock authorization code
+        var code = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        
+        var separator = redirectUri.Contains('?') ? "&" : "?";
+        var callbackUrl = $"{redirectUri}{separator}code={code}";
+        
+        if (!string.IsNullOrEmpty(state))
+        {
+            callbackUrl += $"&state={System.Net.WebUtility.UrlEncode(state)}";
+        }
+
+        return Redirect(callbackUrl);
+    }
+
+    /// <summary>
+    /// Simulates OAuth 2.0 Token Endpoint
+    /// </summary>
+    /// <param name="grantType">Grant type (authorization_code or refresh_token)</param>
+    /// <param name="code">Authorization code (required for authorization_code grant)</param>
+    /// <param name="redirectUri">Redirect URI (required for authorization_code grant)</param>
+    /// <param name="clientId">Client ID</param>
+    /// <param name="refreshToken">Refresh token (required for refresh_token grant)</param>
+    /// <returns>Access token response</returns>
+    [HttpPost("token")]
+    [Consumes("application/x-www-form-urlencoded")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult OAuthToken(
+        [FromForm(Name = "grant_type")] string grantType,
+        [FromForm(Name = "code")] string? code = null,
+        [FromForm(Name = "redirect_uri")] string? redirectUri = null,
+        [FromForm(Name = "client_id")] string? clientId = null,
+        [FromForm(Name = "refresh_token")] string? refreshToken = null)
+    {
+        if (string.IsNullOrEmpty(grantType))
+        {
+            return BadRequest(new { error = "invalid_request", message = "grant_type is required." });
+        }
+
+        if (grantType.Equals("authorization_code", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(code))
+            {
+                return BadRequest(new { error = "invalid_request", message = "code is required for authorization_code grant." });
+            }
+            
+            // In a real app, we would validate the code, client_id, and redirect_uri here.
+            
+            return Ok(CreateTokenResponse());
+        }
+        else if (grantType.Equals("refresh_token", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return BadRequest(new { error = "invalid_request", message = "refresh_token is required for refresh_token grant." });
+            }
+
+            return Ok(CreateTokenResponse());
+        }
+
+        return BadRequest(new { error = "unsupported_grant_type", message = $"Grant type '{grantType}' is not supported." });
+    }
+
+    private object CreateTokenResponse()
+    {
+        return new
+        {
+            access_token = $"mock_access_{Guid.NewGuid():N}",
+            token_type = "Bearer",
+            expires_in = 3600,
+            refresh_token = $"mock_refresh_{Guid.NewGuid():N}",
+            scope = "api.read api.write"
+        };
+    }
 }
