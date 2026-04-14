@@ -39,6 +39,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddSingleton<MockHttp.Services.IResponseGeneratorService, MockHttp.Services.ResponseGeneratorService>();
 builder.Services.AddSingleton<MockHttp.Services.IImageService, MockHttp.Services.ImageService>();
 builder.Services.AddSingleton<MockHttp.Services.IMockDataStore, MockHttp.Services.MockDataStore>();
+builder.Services.AddSingleton<MockHttp.Services.IWebSocketChatService, MockHttp.Services.WebSocketChatService>();
 
 var app = builder.Build();
 
@@ -53,6 +54,11 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
+
 app.MapControllers();
 
 app.Run();
+
+// Expose Program for WebApplicationFactory in tests
+public partial class Program { }

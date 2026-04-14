@@ -1,0 +1,36 @@
+{
+  "version": "0.0.8",
+  "provider": "copilot",
+  "installedPrompts": [
+    "architect",
+    "brainstorm",
+    "code_review",
+    "data_modeller",
+    "devops",
+    "explore",
+    "feature",
+    "fix",
+    "implement",
+    "integration_tests",
+    "memorize",
+    "performance_review",
+    "plan_feature",
+    "planner",
+    "readme",
+    "security_audit",
+    "spec_help",
+    "todo",
+    "tool_help",
+    "unit_tests",
+    "yolo"
+  ],
+  "installedAt": "2026-04-13T03:27:56.927Z",
+  "updatedAt": "2026-04-13T03:27:56.928Z",
+  "projectProfile": {
+    "language": "C#",
+    "frameworks": "ASP.NET Core",
+    "testFramework": "Not decided yet",
+    "architecture": "Microservices",
+    "conventions": ""
+  }
+}
