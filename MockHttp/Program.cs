@@ -50,7 +50,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection must skip WebSocket upgrade requests. A WebSocket client cannot follow
+// the 307 that UseHttpsRedirection issues for GETs on the HTTP port, and would otherwise see
+// the redirect as an abnormal close instead of the 101 Switching Protocols handshake.
+app.UseWhen(
+    ctx => !ctx.WebSockets.IsWebSocketRequest,
+    branch => branch.UseHttpsRedirection());
 
 app.UseAuthorization();
 

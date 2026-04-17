@@ -30,7 +30,8 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
     /// </summary>
     /// <remarks>
     /// Swagger displays this as a plain GET, but a WebSocket client must be used.
-    /// Example: <c>ws://localhost:5218/api/ws/echo</c>
+    /// Use <c>ws://</c> against the HTTP port and <c>wss://</c> against the HTTPS port:
+    /// <c>ws://localhost:5218/api/ws/echo</c> or <c>wss://localhost:7192/api/ws/echo</c>.
     /// Closes gracefully when a Close frame is received.
     /// Returns 400 if the request is not a WebSocket upgrade.
     /// </remarks>
@@ -70,7 +71,8 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
     /// </summary>
     /// <remarks>
     /// Swagger displays this as a plain GET, but a WebSocket client must be used.
-    /// Example: <c>ws://localhost:5218/api/ws/chat</c>
+    /// Use <c>ws://</c> against the HTTP port and <c>wss://</c> against the HTTPS port:
+    /// <c>ws://localhost:5218/api/ws/chat</c> or <c>wss://localhost:7192/api/ws/chat</c>.
     /// Send JSON: <c>{"message":"hello"}</c>.
     /// Malformed JSON returns an error frame while keeping the connection open.
     /// Returns 400 if the request is not a WebSocket upgrade.
