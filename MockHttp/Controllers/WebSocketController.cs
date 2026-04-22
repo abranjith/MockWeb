@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MockHttp.Dtos;
 using MockHttp.Services;
 using System.Net.WebSockets;
@@ -16,7 +17,7 @@ namespace MockHttp.Controllers;
 /// 400/model-binding pipeline interfering with the raw WebSocket upgrade.
 /// </remarks>
 [Route("api/ws")]
-public class WebSocketController(IWebSocketChatService chatService) : ControllerBase
+public class WebSocketController(IWebSocketChatService chatService, ILogger<WebSocketController> logger) : ControllerBase
 {
     private const int BufferSize = 4096;
 
@@ -40,6 +41,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
+            logger.LogWarning("Echo endpoint: WebSocket upgrade required but not provided from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
             Response.StatusCode = 400;
             Response.ContentType = "application/json";
             await Response.WriteAsync(JsonSerializer.Serialize(new
@@ -51,6 +53,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
         }
 
         using var ws = await HttpContext.WebSockets.AcceptWebSocketAsync();
+        logger.LogInformation("Echo endpoint: WebSocket connection established from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
         var buffer = new byte[BufferSize];
 
         while (ws.State == WebSocketState.Open)
@@ -58,12 +61,15 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
             var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             if (result.MessageType == WebSocketMessageType.Close)
             {
+                logger.LogInformation("Echo endpoint: Close frame received, closing connection from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                 break;
             }
+            logger.LogDebug("Echo endpoint: Received {MessageType} message ({ByteCount} bytes), echoing back to {RemoteIp}", result.MessageType, result.Count, HttpContext.Connection.RemoteIpAddress);
             await ws.SendAsync(new ArraySegment<byte>(buffer, 0, result.Count),
                                result.MessageType, result.EndOfMessage, CancellationToken.None);
         }
+        logger.LogInformation("Echo endpoint: WebSocket connection closed for {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
     }
 
     /// <summary>
@@ -82,6 +88,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
+            logger.LogWarning("Chat endpoint: WebSocket upgrade required but not provided from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
             Response.StatusCode = 400;
             Response.ContentType = "application/json";
             await Response.WriteAsync(JsonSerializer.Serialize(new
@@ -93,6 +100,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
         }
 
         using var ws = await HttpContext.WebSockets.AcceptWebSocketAsync();
+        logger.LogInformation("Chat endpoint: WebSocket connection established from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
         var buffer = new byte[BufferSize];
 
         while (ws.State == WebSocketState.Open)
@@ -100,6 +108,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
             var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             if (result.MessageType == WebSocketMessageType.Close)
             {
+                logger.LogInformation("Chat endpoint: Close frame received, closing connection from {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                 break;
             }
@@ -109,7 +118,9 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
             {
                 var dto = JsonSerializer.Deserialize<ChatMessageDto>(text,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                logger.LogInformation("Chat endpoint: Received message from {RemoteIp}: {Message}", HttpContext.Connection.RemoteIpAddress, dto!.Message);
                 var reply = chatService.GetResponse(dto!.Message);
+                logger.LogInformation("Chat endpoint: Sending reply to {RemoteIp}: {Reply}", HttpContext.Connection.RemoteIpAddress, reply);
                 var payload = JsonSerializer.SerializeToUtf8Bytes(new
                 {
                     response = reply,
@@ -119,8 +130,9 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
                 await ws.SendAsync(new ArraySegment<byte>(payload),
                                    WebSocketMessageType.Text, true, CancellationToken.None);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+                logger.LogWarning(ex, "Chat endpoint: Invalid JSON received from {RemoteIp}: {ReceivedText}", HttpContext.Connection.RemoteIpAddress, text);
                 var err = JsonSerializer.SerializeToUtf8Bytes(new
                 {
                     error = "Invalid JSON. Expected: {\"message\":\"<text>\"}",
@@ -130,6 +142,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
                                    WebSocketMessageType.Text, true, CancellationToken.None);
             }
         }
+        logger.LogInformation("Chat endpoint: WebSocket connection closed for {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
     }
 
     /// <summary>
@@ -157,6 +170,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
     {
         if (delayMs < 0 || delayMs > 5000)
         {
+            logger.LogWarning("SSE endpoint: Invalid delayMs parameter ({DelayMs}) from {RemoteIp}", delayMs, HttpContext.Connection.RemoteIpAddress);
             Response.StatusCode = 400;
             Response.ContentType = "application/json";
             await Response.WriteAsync(JsonSerializer.Serialize(new
@@ -169,6 +183,7 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
 
         if (message?.Length > 2000)
         {
+            logger.LogWarning("SSE endpoint: Message too long ({Length} chars) from {RemoteIp}", message.Length, HttpContext.Connection.RemoteIpAddress);
             Response.StatusCode = 400;
             Response.ContentType = "application/json";
             await Response.WriteAsync(JsonSerializer.Serialize(new
@@ -189,6 +204,8 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
         var ct = HttpContext.RequestAborted;
         var tokens = effectiveMessage.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
+        logger.LogInformation("SSE endpoint: Starting stream for {RemoteIp} with {TokenCount} tokens, {DelayMs}ms delay", HttpContext.Connection.RemoteIpAddress, tokens.Length, delayMs);
+
         try
         {
             for (int i = 0; i < tokens.Length; i++)
@@ -199,10 +216,11 @@ public class WebSocketController(IWebSocketChatService chatService) : Controller
             }
             await Response.WriteAsync("data: [DONE]\n\n", ct);
             await Response.Body.FlushAsync(ct);
+            logger.LogInformation("SSE endpoint: Stream completed for {RemoteIp}, sent {TokenCount} tokens", HttpContext.Connection.RemoteIpAddress, tokens.Length);
         }
         catch (OperationCanceledException)
         {
-            // client disconnected — exit silently
+            logger.LogInformation("SSE endpoint: Client disconnected from {RemoteIp} after receiving partial stream", HttpContext.Connection.RemoteIpAddress);
         }
     }
 
