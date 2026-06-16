@@ -4,10 +4,20 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
+const string CorsPolicyName = "AllowAll";
 
 // Add services to the container.
 builder.Services.AddControllers()
     .AddXmlSerializerFormatters();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicyName, policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -56,6 +66,8 @@ if (app.Environment.IsDevelopment())
 app.UseWhen(
     ctx => !ctx.WebSockets.IsWebSocketRequest,
     branch => branch.UseHttpsRedirection());
+
+app.UseCors(CorsPolicyName);
 
 app.UseAuthorization();
 

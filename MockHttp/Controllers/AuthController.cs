@@ -382,20 +382,15 @@ public class AuthController : ControllerBase
     /// <param name="clientId">Client Identifier</param>
     /// <param name="redirectUri">URL to redirect back to</param>
     /// <param name="state">Opaque value used to maintain state between the request and the callback</param>
-    /// <param name="username">User name for login simulation</param>
-    /// <param name="password">Password for login simulation</param>
     /// <returns>Redirects to redirect_uri with code</returns>
     [HttpGet("authorize")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult OAuthAuthorize(
         [FromQuery(Name = "response_type")] string responseType,
         [FromQuery(Name = "client_id")] string clientId,
         [FromQuery(Name = "redirect_uri")] string redirectUri,
-        [FromQuery(Name = "state")] string? state = null,
-        [FromQuery] string? username = null,
-        [FromQuery] string? password = null)
+        [FromQuery(Name = "state")] string? state = null)
     {
         if (string.IsNullOrEmpty(responseType) || !responseType.Equals("code", StringComparison.OrdinalIgnoreCase))
         {
@@ -412,16 +407,6 @@ public class AuthController : ControllerBase
             return BadRequest(new { error = "invalid_request", message = "redirect_uri is required." });
         }
 
-        // Simulate login
-        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-        {
-            return Unauthorized(new 
-            { 
-                error = "login_required", 
-                message = "User authentication failed. Please provide 'username' and 'password' query parameters." 
-            });
-        }
-
         // Generate a mock authorization code
         var code = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+", "-").Replace("/", "_").TrimEnd('=');
         
@@ -434,6 +419,31 @@ public class AuthController : ControllerBase
         }
 
         return Redirect(callbackUrl);
+    }
+
+    /// <summary>
+    /// Simulates OAuth 2.0 Callback Endpoint
+    /// </summary>
+    /// <param name="code">Authorization code from authorization endpoint</param>
+    /// <param name="state">State value provided by client</param>
+    /// <returns>Success response for redirect URI handling</returns>
+    [HttpGet("callback")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult OAuthCallback(
+        [FromQuery] string? code = null,
+        [FromQuery] string? state = null)
+    {
+        return Ok(new
+        {
+            success = true,
+            message = "OAuth callback received successfully",
+            received = new
+            {
+                hasCode = !string.IsNullOrWhiteSpace(code),
+                hasState = !string.IsNullOrWhiteSpace(state)
+            },
+            timestamp = DateTime.UtcNow
+        });
     }
 
     /// <summary>
