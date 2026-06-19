@@ -43,6 +43,43 @@ public class DataController : ControllerBase
     }
 
     /// <summary>
+    /// Returns a quick sample array payload for JSON array/object testing
+    /// </summary>
+    /// <returns>JSON array of sample objects</returns>
+    /// <response code="200">Returns the sample array</response>
+    [HttpGet("quick-array")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetQuickArray()
+    {
+        var payload = new[]
+        {
+            new
+            {
+                id = 1,
+                name = "alpha",
+                category = "sample",
+                isActive = true
+            },
+            new
+            {
+                id = 2,
+                name = "beta",
+                category = "sample",
+                isActive = false
+            },
+            new
+            {
+                id = 3,
+                name = "gamma",
+                category = "sample",
+                isActive = true
+            }
+        };
+
+        return Ok(payload);
+    }
+
+    /// <summary>
     /// Retrieves a specific item by ID
     /// </summary>
     /// <param name="id">The item ID</param>
